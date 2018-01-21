@@ -12,7 +12,11 @@ def main():
     testScreen.fill((0,0,0))
     schedule = ScheduleDisplay(100,100)
     testScreen.blit(schedule, (0, 0))
-    schedule.LoadTodaysClasses()
+    #schedule.LoadTodaysClasses()
+    schedule.firstTimeSlot = '8:00 AM'
+    #schedule.secondTimeSlot = '8:30 AM'
+    print(schedule.todaysClasses)
+    schedule.UpdateTimeSlotHeaders()
     pygame.display.update()
     run = True
     while(run):
