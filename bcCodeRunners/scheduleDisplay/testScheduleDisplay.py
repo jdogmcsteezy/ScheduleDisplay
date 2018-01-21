@@ -3,6 +3,17 @@ import pygame
 from ScheduleDisplay import ScheduleDisplay
 from BCScheduleCreator import PrintClass
 
+def cycleClasses(schedule):
+    schedule.UpdateTimeSlotHeaders()
+    schedule.UpdateClassLists()
+    print('*'*50)
+    print(schedule.firstTimeSlot)
+    for meeting in schedule.firstTimeSlotClasses:
+        PrintClass(meeting)
+    print('-'*50)
+    print(schedule.secondTimeSlot)
+    for meeting in schedule.secondTimeSlotClasses:
+        PrintClass(meeting)
 
 
 def main():
@@ -12,11 +23,23 @@ def main():
     testScreen.fill((0,0,0))
     schedule = ScheduleDisplay(100,100)
     testScreen.blit(schedule, (0, 0))
-    #schedule.LoadTodaysClasses()
-    schedule.firstTimeSlot = '8:00 AM'
-    #schedule.secondTimeSlot = '8:30 AM'
+    schedule.LoadTodaysClasses()
     print(schedule.todaysClasses)
-    schedule.UpdateTimeSlotHeaders()
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+    cycleClasses(schedule)
+
+    
+
     pygame.display.update()
     run = True
     while(run):
@@ -35,3 +58,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
