@@ -2,6 +2,7 @@
 import pygame
 from ScheduleDisplay import ScheduleDisplay
 from BCScheduleCreator import PrintClass
+from contextlib import contextmanager
 
 def cycleClasses(schedule):
     schedule.UpdateTimeSlotHeaders()
@@ -19,27 +20,16 @@ def cycleClasses(schedule):
 def main():
     pygame.init()
     clock = pygame.time.Clock()
-    testScreen = pygame.display.set_mode((300, 300))
+    testScreen = pygame.display.set_mode((600, 730), pygame.NOFRAME)
     testScreen.fill((0,0,0))
-    schedule = ScheduleDisplay(100,100)
-    testScreen.blit(schedule, (0, 0))
+    schedule = ScheduleDisplay(600,1000)
     schedule.LoadTodaysClasses()
-    print(schedule.todaysClasses)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-    cycleClasses(schedule)
-
-    
-
+    #print(schedule.todaysClasses)
+    for class_ in schedule.todaysClasses:
+        print(class_)
+    testClassSurface = schedule.CreateClassSurface(schedule.todaysClasses[0], schedule.classSurface_bgColor1)
+    testScreen.blit(schedule, (0, 0))
+    testScreen.blit(testClassSurface, (0, 0))
     pygame.display.update()
     run = True
     while(run):
