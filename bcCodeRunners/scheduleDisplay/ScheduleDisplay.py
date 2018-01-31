@@ -18,10 +18,7 @@ class ScheduleDisplay(Surface):
         self.width = width
         self.height = height
         self.todaysClasses = []
-        self.firstTimeSlot = ''
-        self.firstTimeSlotClasses = []
-        self.secondTimeSlot = ''
-        self.secondTimeSlotClasses = []
+        self.todaysTimeSlots = []
         self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , 21)
         self.scheduleDisplay_numberOfClasses = 20 + 2
         self.classSurface_classCodeFont = (path.join(self.fonts_path,'OpenSans-Bold.ttf') , 21)
@@ -51,71 +48,27 @@ class ScheduleDisplay(Surface):
                     self.todaysClasses.append(meeting)
         self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
 
-    def UpdateTimeSlotHeaders(self):
-        # If nothing is stored is time slot.
-        if not self.firstTimeSlot:
-            # If the todaysclasses list is not empty
-            if self.todaysClasses:
-                self.firstTimeSlot = ConvertMilitaryToStd(self.todaysClasses[0]['LEC']['Start'])
-                for meeting in self.todaysClasses:
-                    if ConvertMilitaryToStd(meeting['LEC']['Start']) != self.firstTimeSlot:
-                        self.secondTimeSlot = ConvertMilitaryToStd(meeting['LEC']['Start'])
-                        break
-            # If todaysclasses list is empty
-            else:
-                self.firstTimeSlot = 'No Upcoming Classes'
-                self.secondTimeSlot = ''
-        # If somthing is in first time slot
-        elif self.firstTimeSlot:
-            # If nothing is in second time slot there is not more time slots for the day
-            if not self.secondTimeSlot:
-                self.firstTimeSlot = 'No Upcoming Classes'
-            # If somthing is in the second time slot move second time slot to first time slot and update second.
-            else:
-                self.firstTimeSlot = self.secondTimeSlot
-                # Make sure todaysclasses list is not empty
-                if self.todaysClasses:
-                    for meeting in self.todaysClasses:
-                        if ConvertMilitaryToStd(meeting['LEC']['Start']) != self.firstTimeSlot:
-                            self.secondTimeSlot = ConvertMilitaryToStd(meeting['LEC']['Start'])
-                            break
-                # This if may not be needed but will ensure that secondtimeslot is empty if there are no new timeslots.
-                if self.firstTimeSlot == self.secondTimeSlot:
-                    self.secondTimeSlot = ''
+    def LoadTodaysTimeSlots(self):
+        today = datetime.datetime.today().weekday()
+        daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
+        self.todaysTimeSlots = []
+        for meeting in self.todaysClasses:
+            nextTimeSlot = ConvertMilitaryToStd(meeting['LEC']['Start'])
+            if not self.todaysTimeSlots or self.todaysTimeSlots[-1] != nextTimeSlot:
+                self.todaysTimeSlots.append(nextTimeSlot)
 
-    def UpdateClassLists(self):
-        # If nothing is stored in timeslotclasses.
-        if not self.firstTimeSlotClasses:
-            for meeting in list(self.todaysClasses):
-                if self.firstTimeSlot == ConvertMilitaryToStd(meeting['LEC']['Start']):
-                    self.firstTimeSlotClasses.append(meeting)
-                    self.todaysClasses.pop(0)
-            for meeting in list(self.todaysClasses):
-                if self.secondTimeSlot == ConvertMilitaryToStd(meeting['LEC']['Start']):
-                    self.secondTimeSlotClasses.append(meeting)
-                    self.todaysClasses.pop(0)
-            self.firstTimeSlotClasses = sorted(self.firstTimeSlotClasses, key=lambda k: k['LEC']['Room'])
-            self.secondTimeSlotClasses = sorted(self.secondTimeSlotClasses, key=lambda k: k['LEC']['Room']) 
-
-        # If somthing is in first time slot
-        elif self.firstTimeSlotClasses:
-            # If nothing is in second time slot there is not more time slots for the day
-            if not self.secondTimeSlotClasses:
-                self.firstTimeSlotClasses = []
-            # If somthing is in the second time slot move second time slot to first time slot and update second.
+    def GetNextTimeSlotClasses(self):
+        nextTimeSlotClasses = []
+        assert self.todaysTimeSlots, 'TodaysTimeSlots is empty, maybe call LoadTodaysTimeSlots()'
+        for meeting in list(self.todaysClasses):
+            if ConvertMilitaryToStd(meeting['LEC']['Start']) == self.todaysTimeSlots[0]:
+                nextTimeSlotClasses.append(meeting)
+                self.todaysClasses.pop(0)
             else:
-                self.firstTimeSlotClasses = self.secondTimeSlotClasses
-                # Make sure todaysclasses list is not empty
-                self.secondTimeSlotClasses = []
-                for meeting in list(self.todaysClasses):
-                    if self.secondTimeSlot == ConvertMilitaryToStd(meeting['LEC']['Start']):
-                        self.secondTimeSlotClasses.append(meeting)
-                        self.todaysClasses.pop(0)
-                self.secondTimeSlotClasses = sorted(self.secondTimeSlotClasses, key=lambda k: k['LEC']['Room'])
-                # This 'if' may not be needed but will ensure that secondtimeslot is empty if there are no new timeslots.
-                if self.firstTimeSlot == self.secondTimeSlot:
-                    self.secondTimeSlot = []
-        sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
+                break
+        self.todaysTimeSlots.pop(0)
+        sorted(nextTimeSlotClasses, key=lambda k: k['LEC']['Room'])
+        return nextTimeSlotClasses
 
     def CreateClassSurface(self, meeting, bg):
         room = meeting['LEC']['Room']
