@@ -21,21 +21,20 @@ def main():
     pygame.init()
     clock = pygame.time.Clock()
     testScreen = pygame.display.set_mode((600, 730), pygame.NOFRAME)
-    testScreen.fill((0,0,0))
     schedule = ScheduleDisplay(600,1000)
+    schedule.fill((255,255,255))
     schedule.LoadTodaysClasses()
-    #print(schedule.todaysClasses)
-    for class_ in schedule.todaysClasses:
-        print(class_)
-    testClassSurface = schedule.CreateClassSurface(schedule.todaysClasses[0], schedule.classSurface_bgColor1)
-    testScreen.blit(schedule, (0, 0))
-    testScreen.blit(testClassSurface, (0, 0))
+    testScreen.fill((255,255,255))
     pygame.display.update()
     run = True
     while(run):
+        testScreen.fill((255,255,255))
+        schedule.UpdateTimeSlotHeaders()
+        schedule.UpdateClassLists()
+        testScreen.blit(schedule.CreateClassesSurface(schedule.firstTimeSlotClasses),(0, 0))
         clock.tick(26)
-        #testScreen.blit(ScheduleDisplay, (0, 0))
-        #pygame.display.update()
+        pygame.time.wait(1000)
+        pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == ord('q'):

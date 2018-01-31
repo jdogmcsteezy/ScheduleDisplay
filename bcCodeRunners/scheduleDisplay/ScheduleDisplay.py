@@ -17,24 +17,24 @@ class ScheduleDisplay(Surface):
         self.scheduleFile = 'testJSON.json'
         self.width = width
         self.height = height
-        self.fill((255,255,255))
         self.todaysClasses = []
         self.firstTimeSlot = ''
         self.firstTimeSlotClasses = []
         self.secondTimeSlot = ''
         self.secondTimeSlotClasses = []
+        self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , 21)
         self.scheduleDisplay_numberOfClasses = 20 + 2
         self.classSurface_classCodeFont = (path.join(self.fonts_path,'OpenSans-Bold.ttf') , 21)
         self.classSurface_classCodeLeftBuffer = 25
         self.classSurface_classTitleFont = (path.join(self.fonts_path,'OpenSans-Regular.ttf') , 20)
         self.classSurface_widthBuffer = 10
-        self.classSurface_dimensions = (width - self.classSurface_widthBuffer, height / self.scheduleDisplay_numberOfClasses)
-        self.classSurface_bgColor1 = (242,242,242)
-        self.classSurface_bgColor2 = (255,255,255)
+        self.classSurface_dimensions = (width - (self.classSurface_widthBuffer * 2), height / self.scheduleDisplay_numberOfClasses)
+        self.classSurface_bgColors = ((242,242,242), (255,255,255))
         self.classSurface_roomNumberFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf'), 45)
         self.classSurface_floorSurface_widthRatio = .15
         self.classSurface_floorSurface_buffer = (0 , 0)
         self.classSurface_floorSurface_dimensions = (int(self.classSurface_dimensions[0] * self.classSurface_floorSurface_widthRatio), int(self.classSurface_dimensions[1]  - (2 * self.classSurface_floorSurface_buffer[1])))
+        self.classesSurface = None
 
     def Update(self):
         pass
@@ -47,7 +47,7 @@ class ScheduleDisplay(Surface):
         with open(path.join(self.dir_path, self.scheduleFile)) as file:
             data = json.loads(file.read())
         for meeting in data:
-                if DoesClassMeet('Th', meeting, 'LEC'): # <<<< """''Artificially''""" made to "F" for testing, replace with daysOfWeek[today]
+                if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "F" for testing, replace with daysOfWeek[today]
                     self.todaysClasses.append(meeting)
         self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
 
@@ -94,6 +94,9 @@ class ScheduleDisplay(Surface):
                 if self.secondTimeSlot == ConvertMilitaryToStd(meeting['LEC']['Start']):
                     self.secondTimeSlotClasses.append(meeting)
                     self.todaysClasses.pop(0)
+            self.firstTimeSlotClasses = sorted(self.firstTimeSlotClasses, key=lambda k: k['LEC']['Room'])
+            self.secondTimeSlotClasses = sorted(self.secondTimeSlotClasses, key=lambda k: k['LEC']['Room']) 
+
         # If somthing is in first time slot
         elif self.firstTimeSlotClasses:
             # If nothing is in second time slot there is not more time slots for the day
@@ -108,15 +111,11 @@ class ScheduleDisplay(Surface):
                     if self.secondTimeSlot == ConvertMilitaryToStd(meeting['LEC']['Start']):
                         self.secondTimeSlotClasses.append(meeting)
                         self.todaysClasses.pop(0)
+                self.secondTimeSlotClasses = sorted(self.secondTimeSlotClasses, key=lambda k: k['LEC']['Room'])
                 # This 'if' may not be needed but will ensure that secondtimeslot is empty if there are no new timeslots.
                 if self.firstTimeSlot == self.secondTimeSlot:
                     self.secondTimeSlot = []
-
-
-    def CreateTimeSlotClassesSurface(self, classes):
-        pass
-
-
+        sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
 
     def CreateClassSurface(self, meeting, bg):
         room = meeting['LEC']['Room']
@@ -142,3 +141,19 @@ class ScheduleDisplay(Surface):
         classSurface.blit(classCodeText, (roomSurface.get_rect().right + self.classSurface_classCodeLeftBuffer, classSurface.get_rect().centery - classCodeText.get_rect().centery))
         classSurface.blit(classTitleText, ( 225 , classSurface.get_rect().centery - classTitleText.get_rect().centery))
         return classSurface
+
+    def CreateClassesSurface(self, classes):
+        if classes:
+            self.classesSurface = Surface((self.width, self.height))
+            self.classesSurface.fill((255,255,255))
+            timeSurfaceText = ConvertMilitaryToStd(classes[0]['LEC']['Start'])
+            timeSurfaceFont = font.Font(*self.timeSlotFont)
+            timeSurface = timeSurfaceFont.render(timeSurfaceText, True, (51,51,51))
+            self.classesSurface.blit(timeSurface, (self.classSurface_widthBuffer, 0))
+            for i, meeting in enumerate(classes):
+                nextClass = self.CreateClassSurface(meeting, self.classSurface_bgColors[i % 2])
+                self.classesSurface.blit(nextClass,(self.classSurface_widthBuffer, timeSurface.get_rect().height + nextClass.get_rect().height * i))
+            self.classesSurface.convert_alpha()
+        return self.classesSurface
+
+
