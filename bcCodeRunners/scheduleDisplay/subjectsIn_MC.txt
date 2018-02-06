@@ -1,0 +1,18 @@
+AET - Agricultural Engineering Tech
+ANTH - Anthropology
+ASL - American Sign Language
+CHIN - Chinese
+CMST - Communication Studies
+CSCI - Computer Science
+CSL - Counseling
+ENGL - English
+ENGR - Engineering
+HIST - History
+JPN - Japanese
+LEAD - Language Education/Development
+PHIL - Philosophy
+POS - Political Science
+PSY - Psychology
+READ - Reading
+RTVF - Radio/TV/Film
+SOC - Sociology

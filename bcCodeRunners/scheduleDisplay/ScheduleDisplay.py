@@ -1,7 +1,9 @@
 from pygame import Surface, time, font, image, transform, SRCALPHA
-from BCScheduleCreator import ConvertMilitaryToStd, DoesClassMeet, PrintClass
+from BCScheduleCreator import ConvertMilitaryToStd, DoesClassMeet, PrintClass, CreateClassesList, LoadJsonToList, DumpListToJson, CompileSubjectsInBuilding
+from apscheduler.schedulers.background import BackgroundScheduler
 from os import path
-import datetime
+from datetime import datetime
+import time
 import sys
 import json
 import re
@@ -11,16 +13,22 @@ class ScheduleDisplay(Surface):
         Surface.__init__(self, (width, height))
         # You need this if you intend to display any text
         font.init()
+        self.scheduler = BackgroundScheduler()
+        self.scheduler.start()
         # These are the folders we will use for images and fonts
         self.dir_path = path.dirname(path.realpath(__file__))
         self.assets_path = path.join(self.dir_path, 'Assets')
         # notice the 'Fonts' folder is located in the 'Assets'
         self.fonts_path = path.join(self.assets_path, 'Fonts')
         # Change this when done testing ----
+        self.location = 'Main Campus'
+        self.building = 'MC'
+        self.currentSemester = 'Spring 2018'
         self.scheduleFile = 'testJSON.json'
+        self.compiledSubjectsFile = 'subjectsIn_MC.txt'
         self.width = width
         self.height = height
-        self.classesSurfaces = []
+        self.classesSurfacesAndTimes = []
         self.todaysClasses = []
         self.todaysTimeSlots = []
         self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , int(height * .03425))
@@ -36,24 +44,35 @@ class ScheduleDisplay(Surface):
         self.classSurface_roomNumberFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf'), int(height * .04110))
         self.classSurface_floorSurface_widthRatio = .15
         self.classSurface_floorSurface_buffer = (0 , 0)
+        #self.scheduler.add_job(,'cron', id='UpdateJson01', day_of_week='mon-fri,sun', hour='*', second=0)
+        #self.scheduler.add_job(self.UpdateJson,'cron', id='UpdateJson01', day_of_week='mon-fri,sun', hour='*', second=0)
+        #self.scheduler.add_job(self.LoadTodaysClasses, 'cron', id='LoadTodaysClasses01', day_of_week='mon-fri,sun', hour='*', second=10)
+        #self.scheduler.add_job(self.LoadTodaysTimeSlots, 'cron', id='LoadTodaysTimeSlots01', day_of_week='mon-fri,sun', hour='*', second=15)
+        self.LoadTodaysClasses()
+        self.LoadTodaysTimeSlots()
+        self.InitializeJsonData()
+        
+
 
     def Update(self):
         pass
     # Should be called as the clock striked midnight.
     def LoadTodaysClasses(self):
+        print('LOAD TODAYS CLASSES')
         self.todaysClasses = []
         # Returns number from 0-6
-        today = datetime.datetime.today().weekday()
+        today = datetime.today().weekday()
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         with open(path.join(self.dir_path, self.scheduleFile)) as file:
             data = json.loads(file.read())
         for meeting in data:
-                if DoesClassMeet('T', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
+                if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
                     self.todaysClasses.append(meeting)
         self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
     # Should be called as the clock striked midnight.
     def LoadTodaysTimeSlots(self):
-        today = datetime.datetime.today().weekday()
+        print('LOAD TODAYS TIMESLOTS')
+        today = datetime.today().weekday()
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         self.todaysTimeSlots = []
         for meeting in self.todaysClasses:
@@ -115,7 +134,21 @@ class ScheduleDisplay(Surface):
             nextClass = self.CreateClassSurface(meeting, self.classSurface_bgColors[i % 2], self.width - (2 * self.classSurface_widthBuffer), classSurfaceHeight)
             classesSurface.blit(nextClass,(0, timeSurface.get_rect().height + (nextClass.get_rect().height + self.classSurface_heightBuffer) * i))
         classesSurface.convert_alpha()
-        self.classesSurfaces.append(classesSurface)
+        self.classesSurfacesAndTimes.append((classesSurface, timeSurfaceText))
         return classesSurface
 
+    def UpdateJson(self):
+        print('UPDATEE JSON')
+        subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
+        newClassesList = CreateClassesList('MC', 'Spring 2018', 'Main Campus', subjectsPath)
+        if newClassesList:
+            currentClassesList = LoadJsonToList(self.scheduleFile)
+            if newClassesList != currentClassesList:
+                print('That shits different')
+                DumpListToJson(newClassesList, self.scheduleFile)
 
+    def InitializeJsonData(self):
+        if not path.isfile(path.join(self.dir_path, self.compiledSubjectsFile)):
+            CompileSubjectsInBuilding(self.building, self.currentSemester, self.location, path.join(self.dir_path, self.compiledSubjectsFile))
+        if not path.isfile(path.join(self.dir_path, self.scheduleFile)):
+            self.UpdateJson()
