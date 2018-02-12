@@ -48,9 +48,10 @@ class ScheduleDisplay(Surface):
         #self.scheduler.add_job(self.UpdateJson,'cron', id='UpdateJson01', day_of_week='mon-fri,sun', hour='*', second=0)
         #self.scheduler.add_job(self.LoadTodaysClasses, 'cron', id='LoadTodaysClasses01', day_of_week='mon-fri,sun', hour='*', second=10)
         #self.scheduler.add_job(self.LoadTodaysTimeSlots, 'cron', id='LoadTodaysTimeSlots01', day_of_week='mon-fri,sun', hour='*', second=15)
+        self.InitializeJsonData()
         self.LoadTodaysClasses()
         self.LoadTodaysTimeSlots()
-        self.InitializeJsonData()
+        
         
 
 
@@ -63,9 +64,8 @@ class ScheduleDisplay(Surface):
         # Returns number from 0-6
         today = datetime.today().weekday()
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
-        with open(path.join(self.dir_path, self.scheduleFile)) as file:
-            data = json.loads(file.read())
-        for meeting in data:
+        data = LoadJsonToList(path.join(self.dir_path, self.scheduleFile))
+        for meeting in data[1:]:
                 if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
                     self.todaysClasses.append(meeting)
         self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
@@ -134,7 +134,8 @@ class ScheduleDisplay(Surface):
             nextClass = self.CreateClassSurface(meeting, self.classSurface_bgColors[i % 2], self.width - (2 * self.classSurface_widthBuffer), classSurfaceHeight)
             classesSurface.blit(nextClass,(0, timeSurface.get_rect().height + (nextClass.get_rect().height + self.classSurface_heightBuffer) * i))
         classesSurface.convert_alpha()
-        self.classesSurfacesAndTimes.append((classesSurface, timeSurfaceText))
+        if timeSurfaceText != 'No More Classes Today':
+            self.classesSurfacesAndTimes.append((classesSurface, timeSurfaceText))
         return classesSurface
 
     def UpdateJson(self):
@@ -146,9 +147,13 @@ class ScheduleDisplay(Surface):
             subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
             newClassesList = CreateClassesList(self.building, currentTermDict['Term'], self.location, subjectsPath)
             newClassesList.insert(0, currentTermDict)
-            currentClassesList = LoadJsonToList(schedulePath)
-            if newClassesList != currentClassesList:
-                print('That shits different')
+            if path.isfile(schedulePath) and path.getsize(schedulePath) > 0:
+                currentClassesList = LoadJsonToList(schedulePath)
+                if newClassesList != currentClassesList:
+                    print('That shits different')
+                    DumpListToJson(newClassesList, schedulePath)
+            else:
+                open(path.join(self.dir_path, self.scheduleFile), 'w').close()
                 DumpListToJson(newClassesList, schedulePath)
         else:
             emptyList = [currentTermDict]
@@ -159,8 +164,8 @@ class ScheduleDisplay(Surface):
         schedulePath = path.join(self.dir_path, self.scheduleFile)
         if not path.isfile(path.join(self.dir_path, self.compiledSubjectsFile)):
             CompileSubjectsInBuilding(self.building, self.term, self.location, path.join(self.dir_path, self.compiledSubjectsFile))
-        if path.isfile(schedulePath):
-            termDict = LoadJsonToList()[0]
+        if path.isfile(schedulePath) and path.getsize(schedulePath) > 0:
+            termDict = LoadJsonToList(schedulePath)[0]
             if termDict['Term']:
                 currentDate = datetime.now()
                 startDate = datetime.strptime(termDict['Start'], '%m/%d/%Y')

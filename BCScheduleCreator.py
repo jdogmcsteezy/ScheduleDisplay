@@ -60,6 +60,12 @@ def SaveDataToHTML(Subject, Data):
     with open(filePath, 'w') as file:
         file.write(Data)
 
+
+# This function is mostly for TESTING.
+# It takes in a dictionary containing class info and 
+# prints it in a nice format.
+# Normally used in conjuction with the CreateClassList()
+# function which returns a list of dictionaries.
 def PrintClass(classDict):
     print('Name: ', classDict['Title'])
     print('Instructor: ', classDict['Instructor'])
@@ -237,7 +243,6 @@ def GetCurrentTerm():
         Driver.get('http://searchclasses.butte.edu/')
         selection = Select(Driver.find_element_by_id('InputTermId'))
         semesterOptions = [option.text for option in selection.options]
-        print(semesterOptions)
         for semester in semesterOptions:
             Driver.get('http://searchclasses.butte.edu/')
             selection = Select(Driver.find_element_by_id('InputLocationId'))

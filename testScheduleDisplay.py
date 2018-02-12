@@ -23,7 +23,7 @@ def main():
     # clock = pygame.time.Clock()
     # testScreen = pygame.display.set_mode((633, 730), pygame.NOFRAME)
     schedule = ScheduleDisplay(633,730)
-    schedule.UpdateJson()
+    #schedule.UpdateJson()
     # pygame.display.update()
     # run = True
     # while(run):
