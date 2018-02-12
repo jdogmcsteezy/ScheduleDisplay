@@ -1,5 +1,5 @@
 from pygame import Surface, time, font, image, transform, SRCALPHA
-from BCScheduleCreator import ConvertMilitaryToStd, DoesClassMeet, PrintClass, CreateClassesList, LoadJsonToList, DumpListToJson, CompileSubjectsInBuilding
+from BCScheduleCreator import ConvertMilitaryToStd, DoesClassMeet, PrintClass, CreateClassesList, LoadJsonToList, DumpListToJson, CompileSubjectsInBuilding, GetCurrentTerm
 from apscheduler.schedulers.background import BackgroundScheduler
 from os import path
 from datetime import datetime
@@ -23,7 +23,7 @@ class ScheduleDisplay(Surface):
         # Change this when done testing ----
         self.location = 'Main Campus'
         self.building = 'MC'
-        self.currentSemester = 'Spring 2018'
+        self.term = 'Spring 2018'
         self.scheduleFile = 'testJSON.json'
         self.compiledSubjectsFile = 'subjectsIn_MC.txt'
         self.width = width
@@ -139,16 +139,35 @@ class ScheduleDisplay(Surface):
 
     def UpdateJson(self):
         print('UPDATEE JSON')
-        subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
-        newClassesList = CreateClassesList('MC', 'Spring 2018', 'Main Campus', subjectsPath)
-        if newClassesList:
-            currentClassesList = LoadJsonToList(self.scheduleFile)
+        currentTermDict = GetCurrentTerm()
+        schedulePath = path.join(self.dir_path, self.scheduleFile)
+        if currentTermDict['Term']:
+            print('CURRENTTERMDICT IS NOT NONE')
+            subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
+            newClassesList = CreateClassesList(self.building, currentTermDict['Term'], self.location, subjectsPath)
+            newClassesList.insert(0, currentTermDict)
+            currentClassesList = LoadJsonToList(schedulePath)
             if newClassesList != currentClassesList:
                 print('That shits different')
-                DumpListToJson(newClassesList, self.scheduleFile)
+                DumpListToJson(newClassesList, schedulePath)
+        else:
+            emptyList = [currentTermDict]
+            DumpListToJson(emptyList, self.scheduleFile)
+
 
     def InitializeJsonData(self):
+        schedulePath = path.join(self.dir_path, self.scheduleFile)
         if not path.isfile(path.join(self.dir_path, self.compiledSubjectsFile)):
-            CompileSubjectsInBuilding(self.building, self.currentSemester, self.location, path.join(self.dir_path, self.compiledSubjectsFile))
-        if not path.isfile(path.join(self.dir_path, self.scheduleFile)):
+            CompileSubjectsInBuilding(self.building, self.term, self.location, path.join(self.dir_path, self.compiledSubjectsFile))
+        if path.isfile(schedulePath):
+            termDict = LoadJsonToList()[0]
+            if termDict['Term']:
+                currentDate = datetime.now()
+                startDate = datetime.strptime(termDict['Start'], '%m/%d/%Y')
+                endDate = datetime.strptime(termDict['End'], '%m/%d/%Y')
+                if not (startDate <= currentDate and currentDate <= endDate):
+                    self.UpdateJson()
+            else:
+                self.UpdateJson()
+        else:
             self.UpdateJson()

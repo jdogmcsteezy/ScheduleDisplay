@@ -1,5 +1,5 @@
 import os
-import datetime
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.keys import Keys
@@ -76,6 +76,8 @@ def CleanText(string):
     string = string.replace('  ', '')
     return string.strip()
 
+# Used to convert standard time to military time, this makes it easier to compare times.
+# Parse schedule stores class Start and End times in military.
 def ConvertStdToMilitary(time12):
     hour24 = 0
     min24 = 0 
@@ -89,6 +91,8 @@ def ConvertStdToMilitary(time12):
     min24 += int(minMatch.group()[1:])
     return '{}:{}'.format(hour24 if hour24 > 9 else ('0' + str(hour24)), min24 if min24 > 9 else ('0' + str(min24)))
 
+ # Used to convert military time to standard time. So that info can be displayed for us humans.
+ # Parse schedule stores class Start and End times in military.
 def ConvertMilitaryToStd(time24):
     hour12 = 0
     min12 = 0 
@@ -148,6 +152,16 @@ def ParseSchedule(classes):
         schedule[type_] = meeting
     # Return schedule dict.
     return schedule
+
+def ParseSemesterDates(data):
+    soup = BeautifulSoup(data, 'lxml')
+    # Grab every table row inside a <body> 
+    body = soup.find('body')
+    # Look for the date pattern
+    datePattern = re.compile(r'\d{1,2}/\d{1,2}/\d{4} - \d{1,2}/\d{1,2}/\d{4}')
+    dateMatch = datePattern.search(body.text)
+    dateTuple = tuple(dateMatch.group().split(' - '))
+    return (dateTuple)
 
 # Takes the files saved by GrabClassData and parses them into a dict.
 # At this point this function needs a building specified based on how it parses
@@ -217,6 +231,36 @@ def CompileSubjectsInBuilding(building, semester, location, fileName):
                     print(subject)
                     file.write(subject + '\n')
 
+def GetCurrentTerm():
+    with Web_Driver() as Driver:
+        currentDate = datetime.now()
+        Driver.get('http://searchclasses.butte.edu/')
+        selection = Select(Driver.find_element_by_id('InputTermId'))
+        semesterOptions = [option.text for option in selection.options]
+        print(semesterOptions)
+        for semester in semesterOptions:
+            Driver.get('http://searchclasses.butte.edu/')
+            selection = Select(Driver.find_element_by_id('InputLocationId'))
+            selection.select_by_visible_text('Main Campus')
+            selection = Select(Driver.find_element_by_id('InputSubjectId'))
+            selection.select_by_visible_text('MATH - Mathematics')
+            selection = Select(Driver.find_element_by_id('InputTermId'))
+            if str(currentDate.year) in semester:
+                selection.select_by_visible_text(semester)
+                Driver.find_element_by_id('searchButton').click()
+                WebDriverWait(Driver, 60).until(EC.presence_of_element_located((By.ID, 'resultsBoiler')))
+                tableData = Driver.page_source
+                semesterDateTuple = ParseSemesterDates(tableData)
+                startDate = datetime.strptime(semesterDateTuple[0], '%m/%d/%Y')
+                endDate = datetime.strptime(semesterDateTuple[1], '%m/%d/%Y')
+                if startDate <= currentDate and currentDate <= endDate:
+                    semesterDict = {'Term' : semester, 'Start': semesterDateTuple[0], 'End': semesterDateTuple[1]}
+                    return semesterDict
+
+        return {'Term' : None, 'Start': None, 'End': None}
+
+
+
 def DoesClassMeet(day, meeting, type):
     if meeting[type] is not None:
         if day in meeting[type]['Days']:
@@ -231,7 +275,6 @@ def CreateClassesList(building, semester, location, fileName):
         data = GrabClassData(semester, location, subject)
         print(subject)
         ParseHTMLtoJSON(data, classes, building)
-    print(type(classes))
     classesSet = []
     for d in classes:
         if d not in classesSet:
@@ -246,3 +289,4 @@ def LoadJsonToList(fileName):
     with open(fileName) as file:
         data = json.loads(file.read())
         return data
+
