@@ -109,11 +109,14 @@ def ConvertMilitaryToStd(time24):
     hour12 += int(hourMatch.group()[:-1])
     min12 += int(minMatch.group()[1:])
     timeOfDay = ''
-    if hour12 > 12:
+    if hour12 >= 12:
         timeOfDay = 'PM'
-        hour12 -= 12
+        if hour12 > 12:
+            hour12 -= 12
     else:
         timeOfDay = 'AM'
+    
+    
     return '{}:{} {}'.format(hour12, min12 if min12 > 9 else ('0' + str(min12)), timeOfDay)
 
 def ParseSchedule(classes):

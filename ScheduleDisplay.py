@@ -2,8 +2,8 @@ from pygame import Surface, time, font, image, transform, SRCALPHA
 from BCScheduleCreator import ConvertMilitaryToStd, DoesClassMeet, PrintClass, CreateClassesList, LoadJsonToList, DumpListToJson, CompileSubjectsInBuilding, GetCurrentTerm
 from apscheduler.schedulers.background import BackgroundScheduler
 from os import path
-from datetime import datetime
-import time
+from datetime import datetime, timedelta
+from time import localtime, strptime
 import sys
 import json
 import re
@@ -28,7 +28,13 @@ class ScheduleDisplay(Surface):
         self.compiledSubjectsFile = 'subjectsIn_MC.txt'
         self.width = width
         self.height = height
+        self.backgroundImageFile = 'MapBG.png'
+        self.backgroundImage = image.load(path.join(self.assets_path, self.backgroundImageFile))
+        self.backgroundImage = transform.smoothscale(self.backgroundImage, (self.width, self.height))
+        self.backgroundImage.convert_alpha()
+        self.timeSlotDisplayBuffer = 5
         self.classesSurfacesAndTimes = []
+        self.noMoreClassesFlag = False
         self.todaysClasses = []
         self.todaysTimeSlots = []
         self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , int(height * .03425))
@@ -44,10 +50,10 @@ class ScheduleDisplay(Surface):
         self.classSurface_roomNumberFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf'), int(height * .04110))
         self.classSurface_floorSurface_widthRatio = .15
         self.classSurface_floorSurface_buffer = (0 , 0)
-        #self.scheduler.add_job(,'cron', id='UpdateJson01', day_of_week='mon-fri,sun', hour='*', second=0)
-        #self.scheduler.add_job(self.UpdateJson,'cron', id='UpdateJson01', day_of_week='mon-fri,sun', hour='*', second=0)
-        #self.scheduler.add_job(self.LoadTodaysClasses, 'cron', id='LoadTodaysClasses01', day_of_week='mon-fri,sun', hour='*', second=10)
-        #self.scheduler.add_job(self.LoadTodaysTimeSlots, 'cron', id='LoadTodaysTimeSlots01', day_of_week='mon-fri,sun', hour='*', second=15)
+        self.scheduler.add_job(CompileSubjectsInBuilding,'cron', id='CompileSubjects01', day_of_week='mon-fri', hour=1, args=[self.building, self.term, self.location, path.join(self.dir_path, self.compiledSubjectsFile)])
+        self.scheduler.add_job(self.UpdateJson,'cron', id='UpdateJson01', day_of_week='mon-fri', hour=2)
+        self.scheduler.add_job(self.LoadTodaysClasses, 'cron', id='LoadTodaysClasses01', day_of_week='mon-fri', hour=2, minute=30)
+        self.scheduler.add_job(self.LoadTodaysTimeSlots, 'cron', id='LoadTodaysTimeSlots01', day_of_week='mon-fri', hour=2, minute=35)
         self.InitializeJsonData()
         self.LoadTodaysClasses()
         self.LoadTodaysTimeSlots()
@@ -56,10 +62,55 @@ class ScheduleDisplay(Surface):
 
 
     def Update(self):
-        pass
+        maxHeight = self.height
+        currentTime = datetime.now()
+        if self.classesSurfacesAndTimes:
+            latestTimeSlot = self.classesSurfacesAndTimes[0][1]
+            if latestTimeSlot < currentTime:
+                self.classesSurfacesAndTimes.pop(0)
+                self.fill((252,252,252))
+                self.blit(self.backgroundImage, (0,0))
+                for classesSurface in self.classesSurfacesAndTimes[:-1][0]:
+                    self.blit(classesSurface, ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                    maxHeight -= classesSurface.get_rect().height
+                if self.classesSurfacesAndTimes[0] < maxHeight:
+                    self.blit(self.classesSurfacesAndTimes[0], ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                    for i in range(len(self.todaysTimeSlots)):
+                        nextClasses = self.GetNextTimeSlotClasses()
+                        nextClassesSurface = self.CreateClassesSurface(nextClasses)
+                        if nextClassesSurface.get_rect().height > maxHeight:
+                            break
+                        self.blit(nextClassesSurface, ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                        maxHeight -= nextClassesSurface.get_rect().height
+
+        else:
+            if self.todaysClasses:
+                self.noMoreClassesFlag = False
+                self.fill((252,252,252))
+                self.blit(self.backgroundImage, (0,0))
+                for i in range(len(self.todaysTimeSlots)):
+                    nextClasses = self.GetNextTimeSlotClasses()
+                    nextClassesSurface = self.CreateClassesSurface(nextClasses)
+                    if nextClassesSurface.get_rect().height > maxHeight:
+                        break
+                    self.blit(nextClassesSurface, ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                    maxHeight -= nextClassesSurface.get_rect().height
+            else:
+                if not self.noMoreClassesFlag:
+                    self.noMoreClassesFlag = True
+                    noClassesSurface = self.CreateClassesSurface([])
+                    self.fill((252,252,252))
+                    self.blit(self.backgroundImage, (0,0))
+                    self.blit(noClassesSurface,(0,0))
+
+
+
+
+        #print(self.todaysTimeSlots[0])
+
     # Should be called as the clock striked midnight.
     def LoadTodaysClasses(self):
-        print('LOAD TODAYS CLASSES')
+        currentTime = datetime.now()
         self.todaysClasses = []
         # Returns number from 0-6
         today = datetime.today().weekday()
@@ -67,11 +118,15 @@ class ScheduleDisplay(Surface):
         data = LoadJsonToList(path.join(self.dir_path, self.scheduleFile))
         for meeting in data[1:]:
                 if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
-                    self.todaysClasses.append(meeting)
-        self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start']) 
+                    meetingStart = ConvertMilitaryToStd(meeting['LEC']['Start'])
+                    timeSlot = datetime.combine(currentTime.date(), datetime.strptime(meetingStart, '%I:%M %p').time())
+                    timeSlot = timeSlot + timedelta(minutes=self.timeSlotDisplayBuffer)
+                    if timeSlot >= currentTime:
+                        self.todaysClasses.append(meeting)
+        self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start'])
+        print(self.todaysClasses)
     # Should be called as the clock striked midnight.
     def LoadTodaysTimeSlots(self):
-        print('LOAD TODAYS TIMESLOTS')
         today = datetime.today().weekday()
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         self.todaysTimeSlots = []
@@ -135,22 +190,22 @@ class ScheduleDisplay(Surface):
             classesSurface.blit(nextClass,(0, timeSurface.get_rect().height + (nextClass.get_rect().height + self.classSurface_heightBuffer) * i))
         classesSurface.convert_alpha()
         if timeSurfaceText != 'No More Classes Today':
-            self.classesSurfacesAndTimes.append((classesSurface, timeSurfaceText))
+            currentTime = datetime.now()
+            timeSlot = datetime.combine(currentTime.date(), datetime.strptime(timeSurfaceText, '%I:%M %p').time())
+            timeSlot = timeSlot + timedelta(minutes=self.timeSlotDisplayBuffer)
+            self.classesSurfacesAndTimes.append((classesSurface, timeSlot))
         return classesSurface
 
     def UpdateJson(self):
-        print('UPDATEE JSON')
         currentTermDict = GetCurrentTerm()
         schedulePath = path.join(self.dir_path, self.scheduleFile)
         if currentTermDict['Term']:
-            print('CURRENTTERMDICT IS NOT NONE')
             subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
             newClassesList = CreateClassesList(self.building, currentTermDict['Term'], self.location, subjectsPath)
             newClassesList.insert(0, currentTermDict)
             if path.isfile(schedulePath) and path.getsize(schedulePath) > 0:
                 currentClassesList = LoadJsonToList(schedulePath)
                 if newClassesList != currentClassesList:
-                    print('That shits different')
                     DumpListToJson(newClassesList, schedulePath)
             else:
                 open(path.join(self.dir_path, self.scheduleFile), 'w').close()
