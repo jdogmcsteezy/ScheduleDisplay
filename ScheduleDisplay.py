@@ -32,7 +32,7 @@ class ScheduleDisplay(Surface):
         self.backgroundImage = image.load(path.join(self.assets_path, self.backgroundImageFile))
         self.backgroundImage = transform.smoothscale(self.backgroundImage, (self.width, self.height))
         self.backgroundImage.convert_alpha()
-        self.timeSlotDisplayBuffer = 5
+        self.timeSlotDisplayBuffer = 0
         self.classesSurfacesAndTimes = []
         self.noMoreClassesFlag = False
         self.todaysClasses = []
@@ -40,9 +40,10 @@ class ScheduleDisplay(Surface):
         self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , int(height * .03425))
         self.scheduleDisplay_numberOfClasses = 20
         self.classSurface_classCodeFont = (path.join(self.fonts_path,'OpenSans-Bold.ttf') , int(height * .02877))
-        self.classSurface_classCodeLeftBuffer = int(width * .0395)
+        self.classSurface_classCodeLeftBuffer = int(width * .01580)
         self.classSurface_classTitleFont = (path.join(self.fonts_path,'OpenSans-Regular.ttf') , int(height * .02740))
-        self.classSurface_classTitleLeftBuffer = int(width * .02)
+        self.classSurface_classTitleLeftBuffer = int(width * .18167)
+        self.classSurface_classInstructorFont = (path.join(self.fonts_path,'OpenSans-Regular.ttf') ,int(height * .01370))
         # These can be removed, then we can just put (int(width/height * 1111)) where ever they end up in the code.
         self.classSurface_widthBuffer = int(width * .0158)
         self.classSurface_heightBuffer = int(height * .00411)
@@ -68,13 +69,17 @@ class ScheduleDisplay(Surface):
             latestTimeSlot = self.classesSurfacesAndTimes[0][1]
             if latestTimeSlot < currentTime:
                 self.classesSurfacesAndTimes.pop(0)
+                if not self.classesSurfacesAndTimes:
+                    return self
                 self.fill((252,252,252))
                 self.blit(self.backgroundImage, (0,0))
-                for classesSurface in self.classesSurfacesAndTimes[:-1][0]:
-                    self.blit(classesSurface, ((self.classSurface_widthBuffer), (self.height - maxHeight)))
-                    maxHeight -= classesSurface.get_rect().height
-                if self.classesSurfacesAndTimes[0] < maxHeight:
-                    self.blit(self.classesSurfacesAndTimes[0], ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                for classesSurfaceAndTime in self.classesSurfacesAndTimes[:-1]:
+                    self.blit(classesSurfaceAndTime[0], ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                    maxHeight -= classesSurfaceAndTime[0].get_rect().height
+                newestTimeSlotHeight = self.classesSurfacesAndTimes[-1][0].get_rect().height
+                if newestTimeSlotHeight < maxHeight:
+                    self.blit(self.classesSurfacesAndTimes[-1][0], ((self.classSurface_widthBuffer), (self.height - maxHeight)))
+                    maxHeight -= newestTimeSlotHeight
                     for i in range(len(self.todaysTimeSlots)):
                         nextClasses = self.GetNextTimeSlotClasses()
                         nextClassesSurface = self.CreateClassesSurface(nextClasses)
@@ -82,7 +87,6 @@ class ScheduleDisplay(Surface):
                             break
                         self.blit(nextClassesSurface, ((self.classSurface_widthBuffer), (self.height - maxHeight)))
                         maxHeight -= nextClassesSurface.get_rect().height
-
         else:
             if self.todaysClasses:
                 self.noMoreClassesFlag = False
@@ -102,14 +106,10 @@ class ScheduleDisplay(Surface):
                     self.fill((252,252,252))
                     self.blit(self.backgroundImage, (0,0))
                     self.blit(noClassesSurface,(0,0))
-
-
-
-
-        #print(self.todaysTimeSlots[0])
-
+        return self
     # Should be called as the clock striked midnight.
     def LoadTodaysClasses(self):
+        print('LoadTodaysClasses')
         currentTime = datetime.now()
         self.todaysClasses = []
         # Returns number from 0-6
@@ -117,16 +117,16 @@ class ScheduleDisplay(Surface):
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         data = LoadJsonToList(path.join(self.dir_path, self.scheduleFile))
         for meeting in data[1:]:
-                if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
+                if DoesClassMeet(daysOfWeek[today], meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
                     meetingStart = ConvertMilitaryToStd(meeting['LEC']['Start'])
                     timeSlot = datetime.combine(currentTime.date(), datetime.strptime(meetingStart, '%I:%M %p').time())
                     timeSlot = timeSlot + timedelta(minutes=self.timeSlotDisplayBuffer)
                     if timeSlot >= currentTime:
                         self.todaysClasses.append(meeting)
         self.todaysClasses = sorted(self.todaysClasses, key=lambda k: k['LEC']['Start'])
-        print(self.todaysClasses)
     # Should be called as the clock striked midnight.
     def LoadTodaysTimeSlots(self):
+        print('LoadTodaysTimeSlots')
         today = datetime.today().weekday()
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         self.todaysTimeSlots = []
@@ -136,6 +136,7 @@ class ScheduleDisplay(Surface):
                 self.todaysTimeSlots.append(nextTimeSlot)
 
     def GetNextTimeSlotClasses(self):
+        print('GetNextTimeSlotClasses')
         nextTimeSlotClasses = []
         if self.todaysTimeSlots:
             for meeting in list(self.todaysClasses):
@@ -146,6 +147,7 @@ class ScheduleDisplay(Surface):
                     break
             self.todaysTimeSlots.pop(0)
         nextTimeSlotClasses = sorted(nextTimeSlotClasses, key=lambda k: k['LEC']['Room'])
+        print(nextTimeSlotClasses)
         return nextTimeSlotClasses
 
     def CreateClassSurface(self, meeting, bg, width, height):
@@ -167,14 +169,18 @@ class ScheduleDisplay(Surface):
         classCodeText = classCodeFont.render(classCode, True, (0,0,0))
         classTitleFont = font.Font(*self.classSurface_classTitleFont)
         classTitleText = classTitleFont.render(title, True, (0,0,0))
+        classInstructorFont = font.Font(*self.classSurface_classInstructorFont)
+        classInstructorText = classInstructorFont.render(instructor, True, (0,0,0))
         classSurface = Surface((width, height))
         classSurface.fill(bg)
         classSurface.blit(roomSurface,self.classSurface_floorSurface_buffer)
         classSurface.blit(classCodeText, (roomSurface.get_rect().right + self.classSurface_classCodeLeftBuffer, classSurface.get_rect().centery - classCodeText.get_rect().centery))
-        classSurface.blit(classTitleText, (roomSurface.get_rect().right + self.classSurface_classCodeLeftBuffer + int(self.width * .18957), classSurface.get_rect().centery - classTitleText.get_rect().centery))
+        classSurface.blit(classTitleText, (roomSurface.get_rect().right + self.classSurface_classCodeLeftBuffer + self.classSurface_classTitleLeftBuffer, classSurface.get_rect().centery - classTitleText.get_rect().centery))
+        classSurface.blit(classInstructorText , (classSurface.get_rect().width - classInstructorText.get_rect().width - 10, classSurface.get_rect().centery + classTitleText.get_rect().centery - classInstructorText.get_rect().height - 4))
         return classSurface
 
     def CreateClassesSurface(self, classes):
+        print('CreateClassesSurface')
         if classes:
             timeSurfaceText = ConvertMilitaryToStd(classes[0]['LEC']['Start'])
         else:
@@ -197,6 +203,7 @@ class ScheduleDisplay(Surface):
         return classesSurface
 
     def UpdateJson(self):
+        print('UpdateJson')
         currentTermDict = GetCurrentTerm()
         schedulePath = path.join(self.dir_path, self.scheduleFile)
         if currentTermDict['Term']:
