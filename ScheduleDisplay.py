@@ -24,7 +24,7 @@ class ScheduleDisplay(Surface):
         self.location = 'Main Campus'
         self.building = 'MC'
         self.term = 'Spring 2018'
-        self.scheduleFile = 'testJSON.json'
+        self.scheduleFile = 'testJSON1.json'
         self.compiledSubjectsFile = 'subjectsIn_MC.txt'
         self.width = width
         self.height = height
@@ -32,7 +32,7 @@ class ScheduleDisplay(Surface):
         self.backgroundImage = image.load(path.join(self.assets_path, self.backgroundImageFile))
         self.backgroundImage = transform.smoothscale(self.backgroundImage, (self.width, self.height))
         self.backgroundImage.convert_alpha()
-        self.timeSlotDisplayBuffer = 0
+        self.timeSlotDisplayBuffer = 8
         self.classesSurfacesAndTimes = []
         self.noMoreClassesFlag = False
         self.todaysClasses = []
@@ -204,11 +204,20 @@ class ScheduleDisplay(Surface):
 
     def UpdateJson(self):
         print('UpdateJson')
-        currentTermDict = GetCurrentTerm()
+        try:
+            currentTermDict = GetCurrentTerm()
+        except TimeoutError:
+            print("TIMEOUT CURRENTTERM")
+            return
         schedulePath = path.join(self.dir_path, self.scheduleFile)
         if currentTermDict['Term']:
+            self.term = currentTermDict['Term']
             subjectsPath = path.join(self.dir_path, self.compiledSubjectsFile)
-            newClassesList = CreateClassesList(self.building, currentTermDict['Term'], self.location, subjectsPath)
+            try:
+                newClassesList = CreateClassesList(self.building, self.term, self.location, subjectsPath)
+            except TimeoutError:
+                print("TIMEOUT NEWCLASSLIST")
+                return
             newClassesList.insert(0, currentTermDict)
             if path.isfile(schedulePath) and path.getsize(schedulePath) > 0:
                 currentClassesList = LoadJsonToList(schedulePath)
@@ -234,7 +243,10 @@ class ScheduleDisplay(Surface):
                 endDate = datetime.strptime(termDict['End'], '%m/%d/%Y')
                 if not (startDate <= currentDate and currentDate <= endDate):
                     self.UpdateJson()
+                    print(1)
             else:
                 self.UpdateJson()
+                print(2)
         else:
             self.UpdateJson()
+            print(3)

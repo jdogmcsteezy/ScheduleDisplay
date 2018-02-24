@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import WebDriverException
 from contextlib import contextmanager
 from bs4 import BeautifulSoup
 import re
@@ -20,10 +21,13 @@ Subjects = ['AB - Agriculture Business', 'ACCT - Accounting', 'AET - Agricultura
 # The browser runs -headless, meaning no screen appears.
 @contextmanager
 def Web_Driver():
-    options = Options()
-    options.add_argument('-headless')
-    driver = webdriver.Firefox(firefox_options=options)
-    yield driver
+    try:
+        options = Options()
+        options.add_argument('-headless')
+        driver = webdriver.Firefox(firefox_options=options)
+        yield driver
+    except WebDriverException: 
+        raise TimeoutError("Selenium webdriver times out.")
     driver.quit()
 
 # Used to do the work of using a firefox web browser to fill Butte College class search forms.
