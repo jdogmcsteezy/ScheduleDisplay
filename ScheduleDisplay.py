@@ -11,6 +11,8 @@ import re
 class ScheduleDisplay(Surface):
     def __init__(self, width, height):
         Surface.__init__(self, (width, height))
+        self.width = width
+        self.height = height
         # You need this if you intend to display any text
         font.init()
         self.scheduler = BackgroundScheduler()
@@ -21,27 +23,42 @@ class ScheduleDisplay(Surface):
         # notice the 'Fonts' folder is located in the 'Assets'
         self.fonts_path = path.join(self.assets_path, 'Fonts')
         # Change this when done testing ----
+        # Information specific to semester, building, and campus.
+        # These are most often used by the BCScheduleCreator module to fill in web forms.
+        # The same forms you would see if you went to http://searchclasses.butte.edu/
         self.location = 'Main Campus'
         self.building = 'MC'
-        self.term = 'Spring 2018'
-        self.scheduleFile = 'testJSON1.json'
+        self.term = ''
+        # The relative location of the files containing the raw class data.
+        self.scheduleFile = 'testJSON.json'
+        # This file is a compilation of Subjects in the 'MC' building. The greatly shortens
+        # the amount of time required to update the json file.
         self.compiledSubjectsFile = 'subjectsIn_MC.txt'
-        self.width = width
-        self.height = height
         self.backgroundImageFile = 'MapBG.png'
         self.backgroundImage = image.load(path.join(self.assets_path, self.backgroundImageFile))
         self.backgroundImage = transform.smoothscale(self.backgroundImage, (self.width, self.height))
         self.backgroundImage.convert_alpha()
+        # This defines the time after a class starts that it will still be displayed.
+        # Ex: TimeSlot ends at 10:00, it will be visable until 10:00 + however miniutes. 
         self.timeSlotDisplayBuffer = 8
+        # Holds All Surfaces that are displayed, and normally the very next one to be displayed after the
+        # next update.
         self.classesSurfacesAndTimes = []
+        # Flag tells object to no longer update screen because nothing has changed.
         self.noMoreClassesFlag = False
+        # Called by LoadTodaysClasses()
         self.todaysClasses = []
+        # Called by Load TodaysTimeSlots()
         self.todaysTimeSlots = []
         self.timeSlotFont = (path.join(self.fonts_path,'OpenSans-CondBold.ttf') , int(height * .03425))
+        # Max number of classes that should be displayed at once.
         self.scheduleDisplay_numberOfClasses = 20
+        # Shot letter-number phrase before the class title.
         self.classSurface_classCodeFont = (path.join(self.fonts_path,'OpenSans-Bold.ttf') , int(height * .02877))
+        # Distance between classCode and roomNumber in pixels.
         self.classSurface_classCodeLeftBuffer = int(width * .01580)
         self.classSurface_classTitleFont = (path.join(self.fonts_path,'OpenSans-Regular.ttf') , int(height * .02740))
+        # Distance between classTitle and classCode in pixels.
         self.classSurface_classTitleLeftBuffer = int(width * .18167)
         self.classSurface_classInstructorFont = (path.join(self.fonts_path,'OpenSans-Regular.ttf') ,int(height * .01370))
         # These can be removed, then we can just put (int(width/height * 1111)) where ever they end up in the code.
@@ -117,7 +134,7 @@ class ScheduleDisplay(Surface):
         daysOfWeek = ['M', 'T', 'W', 'Th', 'F', 'Sat', 'S']
         data = LoadJsonToList(path.join(self.dir_path, self.scheduleFile))
         for meeting in data[1:]:
-                if DoesClassMeet(daysOfWeek[today], meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
+                if DoesClassMeet('M', meeting, 'LEC'): # <<<< """''Artificially''""" made to "T" for testing, replace with daysOfWeek[today]
                     meetingStart = ConvertMilitaryToStd(meeting['LEC']['Start'])
                     timeSlot = datetime.combine(currentTime.date(), datetime.strptime(meetingStart, '%I:%M %p').time())
                     timeSlot = timeSlot + timedelta(minutes=self.timeSlotDisplayBuffer)
@@ -238,6 +255,7 @@ class ScheduleDisplay(Surface):
         if path.isfile(schedulePath) and path.getsize(schedulePath) > 0:
             termDict = LoadJsonToList(schedulePath)[0]
             if termDict['Term']:
+                self.term = termDict['Term']
                 currentDate = datetime.now()
                 startDate = datetime.strptime(termDict['Start'], '%m/%d/%Y')
                 endDate = datetime.strptime(termDict['End'], '%m/%d/%Y')

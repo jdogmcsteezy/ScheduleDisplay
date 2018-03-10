@@ -11,9 +11,9 @@ def main():
     testScreen = pygame.display.set_mode((633, 730), pygame.NOFRAME)
     schedule = ScheduleDisplay(633,730)
     schedule.Update()
-    #schedule.UpdateJson()
     pygame.display.update()
     run = True
+    print(schedule.term)
     while(run):
         #testScreen.fill((255, 255, 225))
         schedule.Update()
